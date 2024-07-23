@@ -6,8 +6,10 @@ import numpy as np
 from roboflow import Roboflow
 from collections import Counter
 
+#initialize variables
 project_url_od, private_api_key, uploaded_file_od, pill_input_array = ("", "", "", [])
 
+#initialize variables to manage the changing session states for Streamlit
 if 'project_url_od' not in st.session_state:
     st.session_state['project_url_od'] = "https://app.roboflow.com/ms-cs-thesis/medication-identification-v3/3"
 if 'workspace_id' not in st.session_state:
@@ -39,22 +41,23 @@ if 'box_width' not in st.session_state:
 #### Set up main app logic
 ##########
 
+#custom function to handle the roboflow inference and results
 def run_inference(uploaded_img, inferenced_img):
     rf = Roboflow(api_key=st.session_state['private_api_key'])
     project = rf.workspace(st.session_state['workspace_id']).project(st.session_state['model_id'])
     version = project.version(st.session_state['version_number'])
     model = version.model
     
-                
+    #utilize the roboflow function for running inference on an image            
     predictions = model.predict(uploaded_img, overlap=int(st.session_state['overlap_threshold']),
         confidence=int(st.session_state['confidence_threshold']), stroke=int(st.session_state['box_width']))
 
-    # drawing bounding boxes with the Pillow library
-    # https://docs.roboflow.com/inference/hosted-api#response-object-format
+    #Initialize arrays for inferred prediction response and the respective model classes
     collected_predictions = []
     collected_classes = []
     
-
+    # drawing bounding boxes with the Pillow library
+    # https://docs.roboflow.com/inference/hosted-api#response-object-format
     for bounding_box in predictions:
         x0 = bounding_box['x'] - bounding_box['width'] / 2
         x1 = bounding_box['x'] + bounding_box['width'] / 2
@@ -95,17 +98,20 @@ def run_inference(uploaded_img, inferenced_img):
             )
     
 
-    ## Subtitle.
-    st.write("### Inferenced Image")    
-    st.image(inferenced_img, caption="Inferenced Image", use_column_width=True)
+    ## Subtitle for inferred image.
+    st.write("### Pills and Predicted Identification")    
+    st.image(inferenced_img, caption="Pills and Predicted Identification", use_column_width=True)
 
-        
+    #Create counters for the number of classes detected and the number of classes entered by the user    
     classesCount = Counter(collected_classes)
     userInputCount = Counter(st.session_state['pill_input_array'])
     
-    if len(collected_classes) != len(st.session_state['pill_input_array']): 
-        st.write("Number of pills selected does not match the number of pills in the image. Please verify selections")
+    if len(collected_classes) != len(st.session_state['pill_input_array']):
+        #purely a check of whether the number of pills for the two arrays match 
+        st.write("Number of pills selected does not match the number of pills in the image. Please verify selections")        
         for x in classesCount:
+            #a further check to see if the pills selected by the user match up with the pills inferred from the uploaded image
+            #write to the app the results to indicate if the correct pills were chosen or if the user needs to get more or put a pill(s) back
             if userInputCount.get(x) == None:
                 st.write("Expected 0 " + x + " and detected " + str(classesCount.get(x)) + ". Please put the pill(s) back.")
             else:
@@ -115,7 +121,8 @@ def run_inference(uploaded_img, inferenced_img):
                     st.write("Expected " + str(userInputCount.get(x)) + " " + x + " and detected " + str(classesCount.get(x)))
         st.write(" ")
 
-    
+    # if the number of pills selected by the user and the number of pills inferred match then a breakdown is written to the screen indicating
+    # what was expected for the number of each selected pill and the number of each pill that was detected
     else:
         flag=0
         for i in classesCount:
@@ -134,6 +141,7 @@ def run_inference(uploaded_img, inferenced_img):
             for x in userInputCount:
                 st.write("Expected " + str(userInputCount.get(x)) + " " + x + " and detected " + str(classesCount.get(x)))
 
+    #write out a list on the screen of the pills selected and the pills detected
     st.write(" ")
     st.write("Pill Images Recognized:")
     for pillsAnalyzed in collected_classes:
@@ -160,6 +168,7 @@ with st.sidebar:
     pill_selected = ""
     pill_qty = ""
 
+    #sets up the selector box for the user to indicate which pills they are prescribed
     pill_selected = st.selectbox("Pill Selector:",
                                  options=("8 HR Acetaminophen 650 MG Extended Release Tablet",                                          
                                           "Acetaminophen 500 MG Tablet",                                          
@@ -167,8 +176,10 @@ with st.sidebar:
                                           ),
                                 key="pill_selected")
     
+    #store the qty of each pill the user selects
     pill_qty = st.number_input("Enter the pill quantity", step=1,min_value=1,value=1)
 
+    #handle the set up of a button to input the pill and qty of the pill
     if st.button("Add a Pill and Qty"):
         x = pill_qty
         while x > 0:
@@ -177,6 +188,7 @@ with st.sidebar:
         pill_selected = ""
         pill_qty = ""
 
+    # button to clear all pill entries recorded to the app
     if st.button("Clear Pill Entries"):
         st.session_state["pill_input_array"].clear()
         
@@ -188,8 +200,10 @@ with st.sidebar:
 st.write("# Pill Detection")
 
 with st.form("project_access"):
+    #hold the project url hosted on Roboflow and the API key
     project_url_od = "https://app.roboflow.com/ms-cs-thesis/medication-identification-v3/3" 
     private_api_key = "FoM7U0Xonm0lSnV74Bfl" 
+    #button to kick off the code for checking if an image has been uploaded and setting the project URL if needed
     submitted = st.form_submit_button("Verify Selected Medication")
     st.write("*** From the left side bar, upload an image (jpg, jpeg, or png) and select each pill you are scheduled to take and the quantity by using the dropdowns and the Add a Pill and Qty button. Your selections can be cleared by using the Clear Pill Entries button. ***")
     
@@ -213,19 +227,13 @@ with st.form("project_access"):
             st.session_state['version_number'] = "3" #extracted_url.split("/")[2] # 3
         
         if uploaded_file_od != None:
-        # User-selected image.
+            # User-selected image.
             image = Image.open(uploaded_file_od)
+            #alter the image to align the image closer to what Roboflow performs on their website when testing images against a model
             uploaded_img = cv2.imdecode(np.frombuffer(uploaded_file_od.read(), np.uint8), 1)
-            #uploaded_img = np.array(image)
+            #convert image to an array
             inferenced_img = np.array(image)
 
-            #file_image = Image.open(uploaded_file_od)
-            #image = file_image.resize((640,640))
-            #uploaded_img = np.array(file_image)
-            #image = cv2.imread(uploaded_file_od.name)
-            
-            #uploaded_img = np.asarray()
-            #inferenced_img = uploaded_img.copy()
-
+            #call the custom inference function
             run_inference(uploaded_img, inferenced_img)
 
