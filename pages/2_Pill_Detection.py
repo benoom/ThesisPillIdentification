@@ -6,6 +6,8 @@ import numpy as np
 from roboflow import Roboflow
 from collections import Counter
 
+#original framework of this app provided by Roboflow: https://github.com/roboflow/streamlit-web-app/tree/main
+
 #initialize variables
 project_url_od, private_api_key, uploaded_file_od, pill_input_array = ("", "", "", [])
 
